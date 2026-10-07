@@ -289,7 +289,7 @@ const MOTIVOS = {
   ],
   quitar: [
     { valor:'Ajuste de inventario', movimiento:'Salida del inventario de EPP (obligatorio justificar)', icono:'📋', descripcion:'Reconteo físico o corrección de stock.' },
-    { valor:'Entrega a REP (persona)', movimiento:'Salida de EPP por entrega a REP (Obligatorio adjuntar evidencia de quien recibe)', icono:'🧑‍🏭', descripcion:'Se entregó a un colaborador (REP) para su uso.' },
+    { valor:'Entrega a colaborador', movimiento:'Salida de EPP por entrega a colaborador (Obligatorio adjuntar evidencia de quien recibe)', icono:'🧑‍🏭', descripcion:'Se entregó a un colaborador para su uso.', pideColaborador:true },
     { valor:'Baja / desecho', movimiento:'Salida de EPP por baja/deshecho (Obligatorio adjuntar evidencia del EPP en mal estado)', icono:'🗑️', descripcion:'Piezas dadas de baja por estar dañadas o en mal estado.' }
   ]
 };
@@ -299,6 +299,17 @@ const TRANSFERENCIAS = [
   { valor:'Almacén → Cuarto de EPP', movimiento:'Entrada de EPP por regreso de almacén (Obligatorio justificar)', destino:'Cuarto de EPP', icono:'📥', descripcion:'Las piezas regresan del Almacén al Cuarto de EPP.' }
 ];
 const UBICACIONES = ['Cuarto de EPP','Almacén'];
+/* Entrega a colaborador: listas de los formularios de SHE */
+const MOTIVOS_CAMBIO = [
+  { valor:'Nuevo ingreso', icono:'🆕', descripcion:'Primera dotación a un colaborador que ingresa.' },
+  { valor:'Cambio por desgaste (1 año de uso)', icono:'⏳', descripcion:'Cumplió 1 año de uso y toca renovarlo.' },
+  { valor:'Cambio por daño (menos de 1 año)', icono:'🛠️', descripcion:'Se dañó antes de cumplir el año de uso.' },
+  { valor:'Reposición', icono:'🔄', descripcion:'Reposición total por pérdida.' },
+  { valor:'Evaluación médica', icono:'🩺', descripcion:'El cambio lo solicita el personal médico.', pideMedico:true }
+];
+const AREAS_COLAB = ['PUT AT WAY','INVENTARIOS','CALIDAD','CIE','PACKING','LP','MANTENIMIENTO','PICKING','SHIPPING','LH','TRAINING','PEOPLE','FLOW','SAURON'];
+const PUESTOS = ['REP','TL','TL SR.','ANALISTA','ANALISTA SR.','SUPERVISOR','MANAGER','AUXILIAR','OPERADOR LOGISTICO','PROBLEM SOLVER','YARD MARSHALL','Otro'];
+const TURNOS = ['Turno 1A','Turno 1B','Turno 2A','Turno 2B','Turno 3A','Turno 3B','Turno 4','Turno 5'];
 /* Préstamo entre sites: el servidor escribe 2 filas (salida en el que presta, entrada en el que recibe) */
 const MOV_PRESTAMO_SALIDA = 'Salida de EPP por préstamo a otro site (Obligatorio adjuntar evidencia de quien recibe)';
 /* ===================================================== */
@@ -412,7 +423,8 @@ async function pintarActividad() {
       siteCol: header.indexOf('SITE MX'),
       proveedor: header.indexOf('Proveedor'),
       evidencia: header.indexOf('Evidencia'),
-      prestamoCon: header.indexOf('Préstamo con')
+      prestamoCon: header.indexOf('Préstamo con'),
+      colaborador: header.indexOf('Nombre del colaborador')
     };
     const items = rows.slice(1)
       .filter(cols => (cols[idx.siteCol] || '').trim() === site)
@@ -428,7 +440,8 @@ async function pintarActividad() {
         piezas: (cols[idx.piezas] || '').trim(),
         proveedor: idx.proveedor >= 0 ? (cols[idx.proveedor] || '').trim() : '',
         evidencia: idx.evidencia >= 0 ? (cols[idx.evidencia] || '').trim() : '',
-        prestamoCon: idx.prestamoCon >= 0 ? (cols[idx.prestamoCon] || '').trim() : ''
+        prestamoCon: idx.prestamoCon >= 0 ? (cols[idx.prestamoCon] || '').trim() : '',
+        colaborador: idx.colaborador >= 0 ? (cols[idx.colaborador] || '').trim() : ''
       }));
     renderActividad(items);
   } catch (err) {
@@ -452,6 +465,7 @@ function renderActividad(items) {
       clase = 'transferencia'; verbo = 'transfirió'; ico = '🔁';
     } else if (/^salida/i.test(x.movimiento)) {
       clase = 'quitar'; verbo = 'quitó'; ico = '➖';
+      if (x.colaborador) extra = ` · entregado a ${x.colaborador}`;
     } else if (x.proveedor) {
       extra = ` · proveedor ${x.proveedor}`;
     }
@@ -516,6 +530,48 @@ function tilesOp(name, opciones) {
         <span class="op-des">${esc(o.descripcion||'')}</span>
       </span>
     </label>`).join('')}</div>`;
+}
+
+/* ---------- Datos del colaborador (solo al elegir "Entrega a colaborador") ---------- */
+function campoColaborador(pre) {
+  const opts = arr => arr.map(v => `<option>${esc(v)}</option>`).join('');
+  return `
+    <div class="campo ancho colab" id="${pre}cambio-w" role="radiogroup" aria-label="Motivo del cambio" hidden>
+      <span>Motivo del cambio <span class="req">*</span></span>
+      ${tilesOp(pre+'cambio', MOTIVOS_CAMBIO)}
+    </div>
+    <label class="campo ancho colab" id="${pre}cmed-w" hidden><span>Personal médico que solicita el cambio <span class="req">*</span></span>
+      <input type="text" id="${pre}cmed" autocomplete="off" maxlength="80" placeholder="Nombre de quien lo solicita"></label>
+    <label class="campo ancho colab" id="${pre}cnom-w" hidden><span>Nombre del colaborador <span class="req">*</span></span>
+      <input type="text" id="${pre}cnom" autocomplete="off" maxlength="80" placeholder="Nombre completo"></label>
+    <label class="campo colab" id="${pre}cbadge-w" hidden><span>Número de badge <span class="req">*</span></span>
+      <input type="text" id="${pre}cbadge" autocomplete="off" inputmode="numeric" maxlength="20" placeholder="Ej. 123456"></label>
+    <label class="campo colab" id="${pre}carea-w" hidden><span>Área <span class="req">*</span></span>
+      <select id="${pre}carea"><option value="">Selecciona…</option>${opts(AREAS_COLAB)}<option>Otros</option></select></label>
+    <label class="campo ancho colab" id="${pre}carea-otro-w" hidden><span>¿Cuál área? <span class="req">*</span></span>
+      <input type="text" id="${pre}carea-otro" autocomplete="off" maxlength="60" placeholder="Escribe el área"></label>
+    <label class="campo colab" id="${pre}cpuesto-w" hidden><span>Puesto de trabajo <span class="req">*</span></span>
+      <select id="${pre}cpuesto"><option value="">Selecciona…</option>${opts(PUESTOS)}</select></label>
+    <label class="campo ancho colab" id="${pre}cpuesto-otro-w" hidden><span>¿Qué puesto es? (justifica) <span class="req">*</span></span>
+      <input type="text" id="${pre}cpuesto-otro" autocomplete="off" maxlength="80" placeholder="Escribe el puesto y por qué no está en la lista"></label>
+    <label class="campo colab" id="${pre}cturno-w" hidden><span>Turno <span class="req">*</span></span>
+      <select id="${pre}cturno"><option value="">Selecciona…</option>${opts(TURNOS)}</select></label>`;
+}
+function pideColaborador(pre, acc) {
+  if (acc !== 'quitar') return false;
+  const el = document.querySelector(`input[name="${pre}motivo"]:checked`);
+  return !!(el && MOTIVOS.quitar[Number(el.value)].pideColaborador);
+}
+function refrescarColaborador(pre, acc) {
+  const on = pideColaborador(pre, acc);
+  document.querySelectorAll('#contenido .colab').forEach(e => { e.hidden = !on; });
+  if (on) {
+    $(pre+'carea-otro-w').hidden = $(pre+'carea').value !== 'Otros';
+    $(pre+'cpuesto-otro-w').hidden = $(pre+'cpuesto').value !== 'Otro';
+    const cEl = document.querySelector(`input[name="${pre}cambio"]:checked`);
+    $(pre+'cmed-w').hidden = !(cEl && MOTIVOS_CAMBIO[Number(cEl.value)].pideMedico);
+  }
+  const r = $(pre+'just-req'); if (r) r.hidden = on; // el motivo del cambio ya hace de justificación
 }
 
 /* ---------- Evidencia (foto comprimida en el navegador) ---------- */
@@ -623,12 +679,13 @@ function abrir(acc) {
           ${acc === 'agregar' ? `<label class="campo ancho" id="${pre}prov-w" hidden><span>Nombre del proveedor <span class="req">*</span></span>
             <input type="text" id="${pre}prov" list="${pre}prov-lista" autocomplete="off" maxlength="80" placeholder="Ej. Calzado Industrial del Norte">
             <datalist id="${pre}prov-lista">${leerJSON(CLAVE_PROV, []).map(p=>`<option value="${esc(p)}">`).join('')}</datalist></label>` : ''}
+          ${acc === 'quitar' ? campoColaborador(pre) : ''}
           ${campoTipoYTalla(pre)}
           <label class="campo ancho" id="${pre}ubic-w"><span>${acc==='agregar' ? '¿A dónde entra?' : '¿De dónde se descuenta?'} <span class="req">*</span></span>
             <select id="${pre}ubic"><option value="">Selecciona…</option>${UBICACIONES.map(u=>`<option>${u}</option>`).join('')}</select></label>
           ${campoEvidencia(pre)}
           <div class="campo ancho" id="${pre}just-w">
-            <span>Justificación corta <span class="req">*</span></span>
+            <span>Justificación corta <span class="req" id="${pre}just-req">*</span></span>
             <textarea id="${pre}just" rows="2" maxlength="140" placeholder="${acc==='agregar' ? 'Ej. Reconteo físico, sobrante de almacén…' : 'Ej. Entregado a José Pérez, dañado por uso…'}"></textarea>
             <span class="contador"><span id="${pre}just-n">0</span>/140</span>
           </div>
@@ -691,7 +748,7 @@ function abrir(acc) {
   $('contenido').innerHTML = html;
   const alCambiar = () => {
     sucio = true;
-    refrescarProveedor(pre, acc); refrescarEvidencia(pre, acc);
+    refrescarProveedor(pre, acc); refrescarEvidencia(pre, acc); refrescarColaborador(pre, acc);
     actualizarResumen(pre, acc);
   };
   $(pre+'tipo').onchange = () => { refrescarTipo(pre); alCambiar(); };
@@ -708,7 +765,7 @@ function abrir(acc) {
     };
   }
   refrescarTipo(pre);
-  refrescarProveedor(pre, acc); refrescarEvidencia(pre, acc);
+  refrescarProveedor(pre, acc); refrescarEvidencia(pre, acc); refrescarColaborador(pre, acc);
   actualizarResumen(pre, acc);
   $('acciones').hidden = false;
 }
@@ -730,7 +787,13 @@ function actualizarResumen(pre, acc) {
     const verbo = acc === 'agregar' ? 'agregar' : 'quitar';
     const prep = acc === 'agregar' ? 'en' : 'de';
     const prov = motivo.pideProveedor ? ($(pre+'prov').value.trim()) : '';
-    sujeto = `<strong>${esc(resp||'Alguien')}</strong> va a <strong>${verbo} ${esc(piezas)} pza(s)</strong> de <strong>${esc(tipo)}${talla?` (${esc(talla)})`:''}</strong> ${prep} <strong>${esc(ubic)}</strong> (${site}), por motivo de "${esc(motivo.valor)}"${prov?`, proveedor <strong>${esc(prov)}</strong>`:''}.${acc==='quitar'?` Se descuenta de <strong>${esc(ubic)}</strong>.`:''}`;
+    let colab = '';
+    if (motivo.pideColaborador) {
+      const nom = $(pre+'cnom').value.trim(), badge = $(pre+'cbadge').value.trim();
+      const cEl = document.querySelector(`input[name="${pre}cambio"]:checked`);
+      colab = `, entrega a <strong>${esc(nom || 'un colaborador')}</strong>${badge ? ` (badge ${esc(badge)})` : ''}${cEl ? ` · ${esc(MOTIVOS_CAMBIO[Number(cEl.value)].valor)}` : ''}`;
+    }
+    sujeto = `<strong>${esc(resp||'Alguien')}</strong> va a <strong>${verbo} ${esc(piezas)} pza(s)</strong> de <strong>${esc(tipo)}${talla?` (${esc(talla)})`:''}</strong> ${prep} <strong>${esc(ubic)}</strong> (${site}), por motivo de "${esc(motivo.valor)}"${prov?`, proveedor <strong>${esc(prov)}</strong>`:''}${colab}.${acc==='quitar'?` Se descuenta de <strong>${esc(ubic)}</strong>.`:''}`;
   } else if (acc === 'prestamo') {
     const o = $(pre+'orig').value, d = $(pre+'dest').value, uo = $(pre+'uorig').value, ud = $(pre+'udest').value;
     if (!tipo || !piezas || !o || !d || !uo || !ud) { vaciarResumen(el); return; }
@@ -769,9 +832,9 @@ function recolectar() {
   const piezas = Number(piezasStr);
   if (!piezasStr || isNaN(piezas) || piezas <= 0) marcar(pre+'piezas');
 
-  const justificacion = $(pre+'just').value.trim();
-  if (!justificacion) marcar(pre+'just');
+  let justificacion = $(pre+'just').value.trim();
 
+  let colaborador = null;
   let movimiento = '', ubicacion = '', proveedor = '';
   let origen = '', destino = '', ubicOrigen = '', ubicDestino = '', siteReg = site;
 
@@ -785,6 +848,31 @@ function recolectar() {
     if (motivo && motivo.pideProveedor) {
       proveedor = $(pre+'prov').value.trim();
       if (!proveedor) marcar(pre+'prov');
+    }
+    if (motivo && motivo.pideColaborador) {
+      const cEl = document.querySelector(`input[name="${pre}cambio"]:checked`);
+      if (!cEl) marcar(pre+'cambio');
+      const nombre = $(pre+'cnom').value.trim(); if (!nombre) marcar(pre+'cnom');
+      const badge = $(pre+'cbadge').value.trim(); if (!badge) marcar(pre+'cbadge');
+      const areaSel = $(pre+'carea').value; if (!areaSel) marcar(pre+'carea');
+      let area = areaSel;
+      if (areaSel === 'Otros') {
+        const otra = $(pre+'carea-otro').value.trim();
+        if (!otra) marcar(pre+'carea-otro');
+        area = 'Otros: ' + otra;
+      }
+      let puesto = $(pre+'cpuesto').value; if (!puesto) marcar(pre+'cpuesto');
+      if (puesto === 'Otro') {
+        const otro = $(pre+'cpuesto-otro').value.trim();
+        if (!otro) marcar(pre+'cpuesto-otro');
+        puesto = 'Otro: ' + otro;
+      }
+      let medico = '';
+      if (cEl && MOTIVOS_CAMBIO[Number(cEl.value)].pideMedico) {
+        medico = $(pre+'cmed').value.trim(); if (!medico) marcar(pre+'cmed');
+      }
+      const turno = $(pre+'cturno').value; if (!turno) marcar(pre+'cturno');
+      colaborador = { motivoCambio: cEl ? MOTIVOS_CAMBIO[Number(cEl.value)].valor : '', nombre, badge, area, puesto, turno, medico };
     }
   } else if (accion === 'prestamo') {
     movimiento = MOV_PRESTAMO_SALIDA;
@@ -803,6 +891,9 @@ function recolectar() {
     ubicacion = dir ? dir.destino : '';
   }
 
+  // En la entrega a colaborador el "Motivo del cambio" hace de justificación
+  if (colaborador && !justificacion) justificacion = colaborador.motivoCambio;
+  if (!justificacion) marcar(pre+'just');
   if (evidenciaObligatoria(pre, accion) && !evidencia) marcar(pre+'evid');
 
   if (faltan.length) {
@@ -826,6 +917,7 @@ function recolectar() {
     site: siteReg, ubicacion, justificacion
   };
   if (proveedor) p.proveedor = proveedor;
+  if (colaborador) p.colaborador = colaborador;
   if (accion === 'prestamo') Object.assign(p, { origen, destino, ubicOrigen, ubicDestino });
   if (evidencia) p.evidencia = { nombre: evidencia.nombre, mime: evidencia.mime, base64: evidencia.base64 };
   return p;
