@@ -247,7 +247,10 @@
 /* =================== CONFIGURACIÓN =================== */
 const CONFIG = {
   URL_SCRIPT: 'https://script.google.com/macros/s/AKfycbwA8V6t48bg-vyZePpoYiuGghP0Gq777TQeHX4pbnflOovwllJ-V_E1fnRSNkWnyIgL/exec',
-  TOKEN: ''
+  TOKEN: '',
+  // Misma hoja/pestaña que lee el dashboard — se usa aquí solo para mostrar
+  // "Actividad reciente" de TODOS, no solo de este equipo.
+  CSV_URL: 'https://docs.google.com/spreadsheets/d/1K94sGKxVbsnAwTn_KrnGqv1Hv9Gl0yI0x3Tb1o6p8Ew/export?format=csv&gid=0'
 };
 const SITES = ['MXCD02','MXCD09','MXCD10','MXCD13'];
 const SHOE_ORDER = ["22","23","24","25","26","27","28","29","30","31","32","33"];
@@ -317,37 +320,106 @@ function mostrarAcciones() {
   window.scrollTo({ top: 0 });
 }
 
-/* ---------- Actividad reciente (local, por site) ---------- */
-const CLAVE_HIST = 'epp_historial';
-function registrarHistorial(p) {
-  const h = leerJSON(CLAVE_HIST, []);
-  h.unshift({ accion: p.accion, tipo: p.tipo, talla: p.talla, medida: p.medida, piezas: p.piezas, site: p.site, fecha: Date.now() });
-  localStorage.setItem(CLAVE_HIST, JSON.stringify(h.slice(0, 40)));
-}
-function tiempoRelativo(ts) {
-  const min = Math.round((Date.now() - ts) / 60000);
+/* ---------- Actividad reciente (de TODOS, leída en vivo de la hoja) ---------- */
+const TRANSFER_TO_ALMACEN_RE = /^salida de epp por entrega a almac/i;
+const TRANSFER_TO_CUARTO_RE = /^entrada de epp por regreso de almac/i;
+
+function tiempoRelativo(d) {
+  if (!d) return '';
+  const min = Math.round((Date.now() - d.getTime()) / 60000);
   if (min < 1) return 'justo ahora';
   if (min < 60) return `hace ${min} min`;
   const h = Math.round(min / 60);
   if (h < 24) return `hace ${h} h`;
   return `hace ${Math.round(h / 24)} d`;
 }
-function pintarActividad() {
+// Convierte "13/9/2026 10:53:07" -> Date. Devuelve null si no logra parsear.
+function parseMarca(str) {
+  if (!str) return null;
+  const m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) return null;
+  const [, d, mo, y, h, mi, s] = m;
+  return new Date(+y, +mo - 1, +d, +h, +mi, +(s || 0));
+}
+// Parser CSV simple con soporte de campos entre comillas
+function parseCSV(text) {
+  const rows = []; let row = [], field = '', inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') { if (text[i+1] === '"') { field += '"'; i++; } else inQuotes = false; }
+      else field += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n' || c === '\r') {
+        if (field !== '' || row.length) { row.push(field); rows.push(row); row = []; field = ''; }
+        if (c === '\r' && text[i+1] === '\n') i++;
+      } else field += c;
+    }
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+async function pintarActividad() {
   $('actSiteNom').textContent = site;
-  const items = leerJSON(CLAVE_HIST, []).filter(x => x.site === site).slice(0, 4);
+  $('actLista').innerHTML = `<div class="act-vacio">Cargando actividad reciente…</div>`;
+  const miteSite = site; // por si cambian de site mientras carga
+  try {
+    const res = await fetch(CONFIG.CSV_URL + '&_=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    if (site !== miteSite) return; // el usuario ya cambió de pantalla
+    const rows = parseCSV(text).filter(r => r.length > 1);
+    const header = rows[0];
+    const idx = {
+      marca: header.indexOf('Marca temporal'),
+      analista: header.indexOf('Nombre del analista'),
+      movimiento: header.indexOf('Tipo de movimiento'),
+      tipo: header.indexOf('Tipo de EPP'),
+      talla: header.indexOf('Talla'),
+      medida: header.indexOf('Medida'),
+      piezas: header.findIndex(h => h.startsWith('Número de piezas')),
+      siteCol: header.indexOf('SITE MX')
+    };
+    const items = rows.slice(1)
+      .filter(cols => (cols[idx.siteCol] || '').trim() === site)
+      .reverse() // las filas se agregan al final, así que las últimas van primero
+      .slice(0, 4)
+      .map(cols => ({
+        marca: parseMarca((cols[idx.marca] || '').trim()),
+        analista: (cols[idx.analista] || '').trim(),
+        movimiento: (cols[idx.movimiento] || '').trim(),
+        tipo: (cols[idx.tipo] || '').trim(),
+        talla: (cols[idx.talla] || '').trim(),
+        medida: (cols[idx.medida] || '').trim(),
+        piezas: (cols[idx.piezas] || '').trim()
+      }));
+    renderActividad(items);
+  } catch (err) {
+    if (site !== miteSite) return;
+    $('actLista').innerHTML = `<div class="act-vacio">No se pudo cargar la actividad reciente. Revisa tu conexión.</div>`;
+  }
+}
+function renderActividad(items) {
   if (!items.length) {
-    $('actLista').innerHTML = `<div class="act-vacio">Aún no hay movimientos registrados desde este equipo para ${esc(site)}.</div>`;
+    $('actLista').innerHTML = `<div class="act-vacio">Aún no hay movimientos registrados para ${esc(site)}.</div>`;
     return;
   }
-  const ICO = { agregar: '➕', quitar: '➖', transferencia: '🔁' };
-  const VERBO = { agregar: 'Agregaste', quitar: 'Quitaste', transferencia: 'Transferiste' };
   $('actLista').innerHTML = items.map(x => {
+    let clase = 'agregar', verbo = 'Agregó', ico = '➕';
+    if (TRANSFER_TO_ALMACEN_RE.test(x.movimiento) || TRANSFER_TO_CUARTO_RE.test(x.movimiento)) {
+      clase = 'transferencia'; verbo = 'Transfirió'; ico = '🔁';
+    } else if (/^salida/i.test(x.movimiento)) {
+      clase = 'quitar'; verbo = 'Quitó'; ico = '➖';
+    }
     const detalle = x.tipo === 'Calzado' ? `Calzado (${x.talla})` : (x.tipo === 'Guantes de seguridad' ? `Guantes (${x.medida})` : x.tipo);
-    return `<div class="act-item ${x.accion}">
-        <span class="ico-act" aria-hidden="true">${ICO[x.accion]||'•'}</span>
+    const quien = x.analista ? esc(x.analista) : 'Alguien';
+    return `<div class="act-item ${clase}">
+        <span class="ico-act" aria-hidden="true">${ico}</span>
         <span class="cuerpo-act">
-          <span class="desc-act">${VERBO[x.accion]||''} ${x.piezas} pza(s) de ${esc(detalle)}</span>
-          <span class="cuando-act">${tiempoRelativo(x.fecha)}</span>
+          <span class="desc-act">${quien} · ${verbo.toLowerCase()} ${esc(x.piezas)} pza(s) de ${esc(detalle)}</span>
+          <span class="cuando-act">${tiempoRelativo(x.marca)}</span>
         </span>
       </div>`;
   }).join('');
@@ -580,7 +652,7 @@ function pintarPend() {
 async function enviarPendientes(silencioso) {
   const lista = leerPend(); if (!lista.length) return;
   const resto = [];
-  for (const p of lista) { try { await enviar(p); registrarHistorial(p); } catch { resto.push(p); } }
+  for (const p of lista) { try { await enviar(p); } catch { resto.push(p); } }
   guardarPend(resto); pintarPend();
   if (!silencioso) avisar(resto.length ? 'Sigue sin conexión. Se reintentará al recuperar señal.' : 'Registros pendientes enviados.', resto.length ? 'error' : 'ok');
 }
@@ -590,7 +662,7 @@ $('btnEnviar').onclick = async () => {
   const p = recolectar(); if (!p) return;
   const b = $('btnEnviar'); b.disabled = true; b.textContent = 'Enviando…';
   try {
-    await enviar(p); registrarHistorial(p);
+    await enviar(p);
     avisar('Registro enviado correctamente.', 'ok'); sucio = false; mostrarAcciones();
   } catch (err) {
     if (err.servidor) avisar('No se guardó: ' + err.message, 'error');
