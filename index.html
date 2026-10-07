@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Carga de inventario EPP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --amarillo:#FFE600; --azul:#3483FA; --azul-osc:#2968C8; --azul-bg:#E3EDFE;
+    --fondo:#EDEDED; --tarjeta:#FFFFFF; --tinta:#333333; --suave:#737373; --linea:#E0E0E0;
+    --verde:#00A650; --verde-bg:#E6F7EE; --rojo:#F23D4F; --rojo-bg:#FDECEE; --gris-bg:#F2F2F2;
+    --morado:#2D3276; --morado-bg:#E3E3F3;
+    --radio:8px;
+    font-family:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    color:var(--tinta);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--fondo)}
+  [hidden]{display:none!important}
+
+  header{background:var(--amarillo);padding:calc(18px + env(safe-area-inset-top,0px)) 16px 18px}
+  .wrap{max-width:760px;margin:0 auto}
+  header h1{margin:0;font-size:clamp(1.7rem,6vw,2.4rem);font-weight:800;line-height:1.05;letter-spacing:-.02em}
+  header p{margin:8px 0 0;font-size:1rem;color:#4a4a00}
+
+  .barra-ap{position:sticky;top:0;z-index:6;background:var(--tarjeta);border-bottom:1px solid var(--linea);
+    padding:calc(10px + env(safe-area-inset-top,0px)) 16px 10px}
+  .barra-ap .wrap{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .volver{font:inherit;font-weight:700;font-size:.92rem;color:var(--azul);background:none;border:0;cursor:pointer;
+    padding:8px 6px;display:flex;align-items:center;gap:4px;white-space:nowrap}
+  .pill-site{font-weight:800;font-size:.85rem;color:var(--morado);background:var(--morado-bg);padding:6px 12px;border-radius:99px}
+  .barra-ap select{font-weight:700;border:1px solid transparent;background-color:var(--gris-bg);padding:8px 10px;border-radius:6px;font:inherit}
+  .entrar{animation:entrar .22s ease-out}
+  @keyframes entrar{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  main{max-width:760px;margin:0 auto;padding:16px}
+  .subtitulo-sec{margin:4px 0 2px;font-size:.8rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--suave)}
+
+  .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:10px}
+  .tile{font:inherit;text-align:left;color:var(--tinta);background:var(--tarjeta);border:1px solid var(--linea);
+    border-left:5px solid transparent;border-radius:var(--radio);
+    padding:20px 18px;cursor:pointer;display:flex;flex-direction:column;gap:8px;align-items:flex-start;position:relative;
+    box-shadow:0 1px 2px rgba(0,0,0,.06);transition:transform .15s,box-shadow .15s,border-color .15s}
+  .tile:hover{transform:translateY(-3px);box-shadow:0 10px 22px rgba(0,0,0,.12)}
+  .tile:active{transform:translateY(-1px)}
+  .tile .flecha{position:absolute;top:18px;right:16px;color:var(--linea);transition:transform .15s,color .15s}
+  .tile:hover .flecha{transform:translateX(3px);color:var(--suave)}
+  .tile .ico{width:52px;height:52px;border-radius:12px;display:grid;place-items:center;font-size:1.6rem}
+  .tile.agregar{border-left-color:var(--verde)}
+  .tile.agregar .ico{background:var(--verde-bg)}
+  .tile.agregar:hover{box-shadow:0 10px 22px rgba(0,166,80,.18)}
+  .tile.quitar{border-left-color:var(--rojo)}
+  .tile.quitar .ico{background:var(--rojo-bg)}
+  .tile.quitar:hover{box-shadow:0 10px 22px rgba(242,61,79,.18)}
+  .tile.transferencia{border-left-color:var(--azul)}
+  .tile.transferencia .ico{background:var(--azul-bg)}
+  .tile.transferencia:hover{box-shadow:0 10px 22px rgba(52,131,250,.18)}
+  .tile .nom{font-size:1.1rem;font-weight:800}
+  .tile .des{font-size:.85rem;color:var(--suave);line-height:1.35}
+  .tile:focus-visible{outline:3px solid var(--azul);outline-offset:2px}
+
+  .sites-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-top:10px}
+  .site-tile{font:inherit;text-align:left;background:var(--tarjeta);border:1px solid var(--linea);border-radius:var(--radio);
+    padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:14px;position:relative;
+    box-shadow:0 1px 2px rgba(0,0,0,.06);transition:transform .15s,box-shadow .15s,border-color .15s}
+  .site-tile:hover{transform:translateY(-3px);box-shadow:0 10px 22px rgba(45,50,118,.16);border-color:var(--morado)}
+  .site-tile:active{transform:translateY(-1px)}
+  .site-tile .ico-site{width:46px;height:46px;border-radius:11px;flex-shrink:0;display:grid;place-items:center;
+    font-size:1.3rem;background:var(--morado-bg);color:var(--morado)}
+  .site-tile .cuerpo{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .site-tile .cod{font-weight:800;font-size:1.1rem;color:var(--morado);letter-spacing:-.01em}
+  .site-tile .ult{display:block;font-size:.76rem;font-weight:600;color:var(--suave)}
+  .site-tile .ult.hoy{color:var(--verde)}
+  .site-tile .flecha{position:absolute;top:50%;right:14px;transform:translateY(-50%);color:var(--linea);transition:transform .15s,color .15s}
+  .site-tile:hover .flecha{transform:translateY(-50%) translateX(3px);color:var(--morado)}
+
+  .tarjeta{background:var(--tarjeta);border-radius:var(--radio);padding:18px 16px;margin-bottom:14px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .tarjeta h2{margin:0 0 4px;font-size:1.2rem;font-weight:700}
+  .sub{margin:0 0 14px;color:var(--suave);font-size:.88rem;line-height:1.4}
+  .dueno{display:inline-block;margin-bottom:8px;font-size:.8rem;font-weight:700;padding:3px 9px;border-radius:99px}
+  .dueno.agregar{color:#00733A;background:var(--verde-bg)}
+  .dueno.quitar{color:#B3192B;background:var(--rojo-bg)}
+  .dueno.transferencia{color:var(--azul-osc);background:var(--azul-bg)}
+
+  .campos{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .campos .ancho{grid-column:1/-1}
+  .campo{display:flex;flex-direction:column;gap:6px;font-size:.88rem;font-weight:600}
+  .campo .req{color:var(--rojo)}
+  .campo.falta input,.campo.falta select,.campo.falta textarea,.campo.falta .tiles-op label{border-color:var(--rojo)}
+  .campo.falta > span:first-child{color:var(--rojo)}
+  input,select,textarea{font:inherit;font-weight:400;font-size:1rem;color:var(--tinta);border:1px solid #BFBFBF;
+    border-radius:6px;padding:11px 12px;background:#fff;width:100%}
+  textarea{resize:vertical;min-height:64px}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--azul);outline-offset:0;border-color:var(--azul)}
+  input:disabled,select:disabled{background:var(--gris-bg);color:var(--suave)}
+  .nota{font-size:.8rem;font-weight:400;color:var(--suave);line-height:1.3}
+  .contador{font-size:.76rem;font-weight:400;color:var(--suave);text-align:right}
+
+  .tiles-op{display:flex;flex-direction:column;gap:8px}
+  .tiles-op input{position:absolute;opacity:0;pointer-events:none}
+  .tiles-op label{display:flex;align-items:center;gap:12px;border:1.5px solid #BFBFBF;border-radius:8px;
+    cursor:pointer;background:#fff;padding:12px;text-align:left}
+  .tiles-op .op-ico{width:38px;height:38px;border-radius:9px;background:var(--gris-bg);display:grid;place-items:center;
+    font-size:1.1rem;flex-shrink:0}
+  .tiles-op .op-tit{font-weight:700;font-size:.94rem;line-height:1.25}
+  .tiles-op .op-des{font-weight:400;font-size:.8rem;color:var(--suave);line-height:1.3;margin-top:2px}
+  .tiles-op input:checked + label{background:var(--azul-bg);border-color:var(--azul)}
+  .tiles-op input:checked + label .op-ico{background:#fff}
+  .tiles-op input:focus-visible + label{outline:2px solid var(--azul);outline-offset:2px}
+
+  .ayuda-ap{display:flex;gap:10px;background:var(--gris-bg);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:.85rem;line-height:1.4;color:var(--tinta)}
+  .ayuda-ap .ico{font-size:1.2rem;flex-shrink:0}
+
+  .resumen-vivo{display:flex;gap:10px;align-items:flex-start;background:var(--morado-bg);border:1.5px dashed var(--morado);
+    border-radius:8px;padding:12px 14px;margin-top:4px;font-size:.88rem;line-height:1.4;color:var(--morado)}
+  .resumen-vivo .ico{font-size:1.15rem;flex-shrink:0}
+  .resumen-vivo strong{color:var(--morado)}
+  .resumen-vivo.vacio{color:var(--suave);font-style:italic}
+
+  .pendientes{display:none;background:#FFF6CC;border:1px solid #E6CF00;border-radius:var(--radio);padding:12px 14px;margin-bottom:14px;
+    font-size:.92rem;align-items:center;justify-content:space-between;gap:12px}
+  .pendientes.visible{display:flex}
+  .pendientes button{font:inherit;font-weight:700;font-size:.88rem;color:var(--azul);background:none;border:0;cursor:pointer;white-space:nowrap}
+
+  .acciones{position:sticky;bottom:0;background:linear-gradient(transparent,var(--fondo) 30%);padding:18px 16px calc(16px + env(safe-area-inset-bottom,0px))}
+  .btn{font:inherit;font-size:1rem;font-weight:700;border:0;border-radius:6px;padding:15px 18px;width:100%;cursor:pointer}
+  .btn-prim{background:var(--azul);color:#fff}
+  .btn-prim:hover{background:var(--azul-osc)}
+  .btn-prim:disabled{background:#A9C9FC;cursor:wait}
+  .btn:focus-visible{outline:3px solid var(--tinta);outline-offset:2px}
+
+  .aviso{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;
+    background:var(--tinta);color:#fff;padding:12px 16px;border-radius:6px;font-size:.92rem;max-width:min(92vw,520px);
+    transition:opacity .2s,transform .2s;z-index:10;pointer-events:none}
+  .aviso.visible{opacity:1;transform:translate(-50%,0)}
+  .aviso.error{background:var(--rojo)} .aviso.ok{background:var(--verde)}
+
+  @media (max-width:560px){ .campos > *:not(.corto){grid-column:1/-1} }
+  @media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+
+  header .cont-h{display:flex;align-items:center;justify-content:space-between;gap:16px}
+  header .ico-h{flex-shrink:0;color:#2b2500;opacity:.85}
+  header .txt-h{min-width:0}
+
+  .pasos{display:flex;flex-direction:column;gap:0;margin-top:22px;background:var(--tarjeta);border-radius:var(--radio);
+    box-shadow:0 1px 2px rgba(0,0,0,.06);overflow:hidden}
+  .paso{display:flex;gap:14px;padding:16px 18px;position:relative}
+  .paso:not(:last-child){border-bottom:1px solid var(--linea)}
+  .paso:not(:last-child)::after{content:'';position:absolute;left:35px;top:48px;bottom:-1px;width:2px;background:var(--linea)}
+  .paso .num{flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--morado-bg);color:var(--morado);
+    font-weight:800;font-size:.85rem;display:grid;place-items:center;z-index:1}
+  .paso .txt strong{display:block;font-size:.92rem;font-weight:700;margin-bottom:2px}
+  .paso .txt span{font-size:.82rem;color:var(--suave);line-height:1.4}
+
+  .act-reciente{margin-top:20px}
+  .act-reciente h3{font-size:.8rem;font-weight:700;letter-spacing:.02em;color:var(--suave);margin:0 0 8px;display:flex;align-items:center;gap:6px}
+  .act-lista{background:var(--tarjeta);border-radius:var(--radio);box-shadow:0 1px 2px rgba(0,0,0,.06);overflow:hidden}
+  .act-item{display:flex;align-items:center;gap:12px;padding:12px 16px}
+  .act-item:not(:last-child){border-bottom:1px solid var(--linea)}
+  .act-item .ico-act{flex-shrink:0;width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:1rem}
+  .act-item.agregar .ico-act{background:var(--verde-bg)}
+  .act-item.quitar .ico-act{background:var(--rojo-bg)}
+  .act-item.transferencia .ico-act{background:var(--azul-bg)}
+  .act-item .cuerpo-act{min-width:0;flex:1}
+  .act-item .desc-act{font-size:.86rem;font-weight:600;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .act-item .cuando-act{font-size:.76rem;color:var(--suave)}
+  .act-vacio{padding:18px 16px;text-align:center;font-size:.85rem;color:var(--suave)}
+</style>
+</head>
+<body>
+
+<header id="cabecera"><div class="wrap cont-h">
+  <div class="txt-h">
+    <h1>Carga de inventario EPP</h1>
+    <p id="subt">Elige el site con el que vas a trabajar</p>
+  </div>
+  <svg class="ico-h" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+    <path d="M4 12a8 8 0 0 1 16 0v7a1 1 0 0 1-1 1h-2v-6H7v6H5a1 1 0 0 1-1-1z"/>
+    <path d="M9 20v-4h6v4"/>
+  </svg>
+</div></header>
+
+<div class="barra-ap" id="barraAp" hidden><div class="wrap">
+  <button type="button" class="volver" id="btnVolver" aria-label="Volver">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Volver</button>
+  <span class="pill-site" id="pillSite"></span>
+  <select id="cambiarSite" aria-label="Cambiar de site"></select>
+</div></div>
+
+<main>
+  <div class="pendientes" id="pendientes"><span id="pendTxt"></span>
+    <button type="button" id="btnPend">Enviar ahora</button></div>
+
+  <div id="pantallaSites">
+    <p class="subtitulo-sec">Selecciona un site</p>
+    <div class="sites-tiles" id="sitesTiles"></div>
+
+    <div class="pasos">
+      <div class="paso"><span class="num">1</span><span class="txt"><strong>Elige tu site</strong><span>El inventario se lleva por separado en cada uno.</span></span></div>
+      <div class="paso"><span class="num">2</span><span class="txt"><strong>Elige qué vas a hacer</strong><span>Agregar, quitar o transferir piezas entre Cuarto de EPP y Almacén.</span></span></div>
+      <div class="paso"><span class="num">3</span><span class="txt"><strong>Llena y envía</strong><span>El resumen te muestra lo que se va a registrar antes de enviar.</span></span></div>
+    </div>
+  </div>
+
+  <div id="pantallaAcciones" hidden>
+    <p class="subtitulo-sec">¿Qué vas a hacer?</p>
+    <div class="tiles">
+      <button type="button" class="tile agregar" data-accion="agregar">
+        <span class="ico" aria-hidden="true">➕</span>
+        <span class="nom">Agregar</span>
+        <span class="des">Entrada de piezas al inventario</span>
+        <svg class="flecha" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+      </button>
+      <button type="button" class="tile quitar" data-accion="quitar">
+        <span class="ico" aria-hidden="true">➖</span>
+        <span class="nom">Quitar</span>
+        <span class="des">Salida de piezas del inventario</span>
+        <svg class="flecha" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+      </button>
+      <button type="button" class="tile transferencia" data-accion="transferencia">
+        <span class="ico" aria-hidden="true">🔁</span>
+        <span class="nom">Transferencia</span>
+        <span class="des">Mover entre Cuarto de EPP y Almacén</span>
+        <svg class="flecha" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+      </button>
+    </div>
+
+    <div class="act-reciente" id="actReciente">
+      <h3>Tu actividad reciente en <span id="actSiteNom"></span></h3>
+      <div class="act-lista" id="actLista"></div>
+    </div>
+  </div>
+
+  <div id="contenido" hidden></div>
+</main>
+
+<div class="acciones" id="acciones" hidden><div class="wrap">
+  <button class="btn btn-prim" id="btnEnviar" type="button">Enviar registro</button>
+</div></div>
+
+<div class="aviso" id="aviso" role="status"></div>
+
+<script>
+/* =================== CONFIGURACIÓN =================== */
+const CONFIG = {
+  URL_SCRIPT: 'https://script.google.com/macros/s/AKfycbwA8V6t48bg-vyZePpoYiuGghP0Gq777TQeHX4pbnflOovwllJ-V_E1fnRSNkWnyIgL/exec',
+  TOKEN: ''
+};
+const SITES = ['MXCD02','MXCD09','MXCD10','MXCD13'];
+const SHOE_ORDER = ["22","23","24","25","26","27","28","29","30","32","33"];
+const GLOVE_ORDER = ["5 (XSS)","6 (XS)","7 (S)","8 (M)","9 (L)","10 (XL)"];
+
+/* Motivos de Agregar/Quitar -> nombre EXACTO del movimiento que ya lee el dashboard */
+const MOTIVOS = {
+  agregar: [
+    { valor:'Ajuste de inventario', movimiento:'Entrada al inventario de EPP (Obligatorio justificar)', icono:'📋', descripcion:'Reconteo físico, sobrante encontrado, corrección de stock.' },
+    { valor:'Compra a proveedor', movimiento:'Entrada de EPP por proveedor (Obligatorio adjuntar factura)', icono:'🧾', descripcion:'Piezas nuevas recibidas de un proveedor.' }
+  ],
+  quitar: [
+    { valor:'Ajuste de inventario', movimiento:'Salida del inventario de EPP (obligatorio justificar)', icono:'📋', descripcion:'Reconteo físico o corrección de stock.' },
+    { valor:'Entrega a REP (persona)', movimiento:'Salida de EPP por entrega a REP (Obligatorio adjuntar evidencia de quien recibe)', icono:'🧑‍🏭', descripcion:'Se entregó a un colaborador (REP) para su uso.' },
+    { valor:'Baja / desecho', movimiento:'Salida de EPP por baja/deshecho (Obligatorio adjuntar evidencia del EPP en mal estado)', icono:'🗑️', descripcion:'Piezas dadas de baja por estar dañadas o en mal estado.' }
+  ]
+};
+/* Transferencia: dirección -> movimiento EXACTO + a dónde llega */
+const TRANSFERENCIAS = [
+  { valor:'Cuarto de EPP → Almacén', movimiento:'Salida de EPP por entrega a almacén (Obligatorio adjuntar evidencia de quien recibe)', destino:'Almacén', icono:'📤', descripcion:'Las piezas salen del Cuarto de EPP y entran al Almacén.' },
+  { valor:'Almacén → Cuarto de EPP', movimiento:'Entrada de EPP por regreso de almacén (Obligatorio justificar)', destino:'Cuarto de EPP', icono:'📥', descripcion:'Las piezas regresan del Almacén al Cuarto de EPP.' }
+];
+const UBICACIONES = ['Cuarto de EPP','Almacén'];
+/* ===================================================== */
+
+const CLAVE_PEND = 'epp_carga_pendientes';
+const $ = id => document.getElementById(id);
+const esc = t => { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; };
+let site = null, accion = null, sucio = false;
+
+const leerJSON = (k, def) => { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch { return def; } };
+
+/* ---------- Pantalla de sites ---------- */
+function textoUltimoSite(s) {
+  const t = leerJSON('epp_ultimo_site', {})[s]; if (!t) return '';
+  const d = new Date(t), hoy = new Date();
+  const mismoDia = d.toDateString() === hoy.toDateString();
+  return mismoDia ? 'Usado hoy' : 'Último uso: ' + d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+}
+function construirSites() {
+  $('sitesTiles').innerHTML = SITES.map(s => {
+    const ult = textoUltimoSite(s);
+    const hoy = ult === 'Usado hoy';
+    return `<button type="button" class="site-tile" data-site="${s}">
+        <span class="ico-site" aria-hidden="true">🏭</span>
+        <span class="cuerpo">
+          <span class="cod">${s}</span>
+          ${ult ? `<span class="ult${hoy?' hoy':''}">${esc(ult)}</span>` : `<span class="ult">Toca para continuar</span>`}
+        </span>
+        <svg class="flecha" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+      </button>`;
+  }).join('');
+  $('sitesTiles').querySelectorAll('.site-tile').forEach(b => b.onclick = () => elegirSite(b.dataset.site));
+  $('cambiarSite').innerHTML = SITES.map(s => `<option value="${s}">${s}</option>`).join('');
+}
+function elegirSite(s) {
+  site = s;
+  const u = leerJSON('epp_ultimo_site', {}); u[s] = Date.now(); localStorage.setItem('epp_ultimo_site', JSON.stringify(u));
+  $('cabecera').hidden = true; $('barraAp').hidden = false; $('pillSite').textContent = site; $('cambiarSite').value = site;
+  mostrarAcciones();
+}
+function mostrarAcciones() {
+  accion = null; sucio = false;
+  $('pantallaSites').hidden = true; $('pantallaAcciones').hidden = false; $('contenido').hidden = true; $('acciones').hidden = true;
+  $('subt').textContent = '';
+  pintarActividad();
+  window.scrollTo({ top: 0 });
+}
+
+/* ---------- Actividad reciente (local, por site) ---------- */
+const CLAVE_HIST = 'epp_historial';
+function registrarHistorial(p) {
+  const h = leerJSON(CLAVE_HIST, []);
+  h.unshift({ accion: p.accion, tipo: p.tipo, talla: p.talla, medida: p.medida, piezas: p.piezas, site: p.site, fecha: Date.now() });
+  localStorage.setItem(CLAVE_HIST, JSON.stringify(h.slice(0, 40)));
+}
+function tiempoRelativo(ts) {
+  const min = Math.round((Date.now() - ts) / 60000);
+  if (min < 1) return 'justo ahora';
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `hace ${h} h`;
+  return `hace ${Math.round(h / 24)} d`;
+}
+function pintarActividad() {
+  $('actSiteNom').textContent = site;
+  const items = leerJSON(CLAVE_HIST, []).filter(x => x.site === site).slice(0, 4);
+  if (!items.length) {
+    $('actLista').innerHTML = `<div class="act-vacio">Aún no hay movimientos registrados desde este equipo para ${esc(site)}.</div>`;
+    return;
+  }
+  const ICO = { agregar: '➕', quitar: '➖', transferencia: '🔁' };
+  const VERBO = { agregar: 'Agregaste', quitar: 'Quitaste', transferencia: 'Transferiste' };
+  $('actLista').innerHTML = items.map(x => {
+    const detalle = x.tipo === 'Calzado' ? `Calzado (${x.talla})` : (x.tipo === 'Guantes de seguridad' ? `Guantes (${x.medida})` : x.tipo);
+    return `<div class="act-item ${x.accion}">
+        <span class="ico-act" aria-hidden="true">${ICO[x.accion]||'•'}</span>
+        <span class="cuerpo-act">
+          <span class="desc-act">${VERBO[x.accion]||''} ${x.piezas} pza(s) de ${esc(detalle)}</span>
+          <span class="cuando-act">${tiempoRelativo(x.fecha)}</span>
+        </span>
+      </div>`;
+  }).join('');
+}
+function confirmarSalida() {
+  return !sucio || confirm('Tienes datos sin enviar. ¿Salir y descartarlos?');
+}
+$('btnVolver').onclick = () => {
+  if (!confirmarSalida()) return;
+  if (accion) { mostrarAcciones(); return; }
+  site = null; $('cabecera').hidden = false; $('barraAp').hidden = true;
+  $('pantallaSites').hidden = false; $('pantallaAcciones').hidden = true;
+  construirSites();
+};
+$('cambiarSite').onchange = e => {
+  if (!confirmarSalida()) { e.target.value = site; return; }
+  elegirSite(e.target.value);
+};
+
+/* ---------- Render de campos comunes ---------- */
+function campoTipoYTalla(pre, tipoVal) {
+  return `
+    <label class="campo ancho" id="${pre}tipo-w"><span>Tipo de EPP <span class="req">*</span></span>
+      <select id="${pre}tipo">
+        <option value="">Selecciona…</option>
+        <option${tipoVal==='Calzado'?' selected':''}>Calzado</option>
+        <option${tipoVal==='Guantes de seguridad'?' selected':''}>Guantes de seguridad</option>
+      </select></label>
+    <label class="campo" id="${pre}talla-w"><span>Talla (Calzado) <span class="req">*</span></span>
+      <select id="${pre}talla"><option value="">Selecciona…</option>${SHOE_ORDER.map(t=>`<option>${t}</option>`).join('')}</select></label>
+    <label class="campo" id="${pre}medida-w"><span>Medida (Guantes) <span class="req">*</span></span>
+      <select id="${pre}medida"><option value="">Selecciona…</option>${GLOVE_ORDER.map(m=>`<option>${esc(m)}</option>`).join('')}</select></label>
+    <label class="campo corto" id="${pre}piezas-w"><span>Piezas <span class="req">*</span></span>
+      <input type="number" id="${pre}piezas" inputmode="numeric" min="1" step="1"></label>`;
+}
+function refrescarTipo(pre) {
+  const tipo = $(pre+'tipo').value;
+  $(pre+'talla-w').hidden = tipo !== 'Calzado';
+  $(pre+'medida-w').hidden = tipo !== 'Guantes de seguridad';
+}
+
+/* ---------- Tiles de opción (radio con icono + título + descripción) ---------- */
+function tilesOp(name, opciones) {
+  return `<div class="tiles-op">${opciones.map((o,i)=>`
+    <input type="radio" name="${name}" id="${name}-${i}" value="${i}">
+    <label for="${name}-${i}">
+      <span class="op-ico" aria-hidden="true">${o.icono||'•'}</span>
+      <span>
+        <span class="op-tit">${esc(o.valor)}</span>
+        <span class="op-des">${esc(o.descripcion||'')}</span>
+      </span>
+    </label>`).join('')}</div>`;
+}
+
+/* ---------- Abrir cada acción ---------- */
+function abrir(acc) {
+  accion = acc; sucio = false;
+  $('pantallaAcciones').hidden = true; $('contenido').hidden = false;
+  $('contenido').classList.remove('entrar'); void $('contenido').offsetWidth; $('contenido').classList.add('entrar');
+  window.scrollTo({ top: 0 });
+
+  const pre = `c-`;
+  let html = '';
+
+  if (acc === 'agregar' || acc === 'quitar') {
+    const nombre = acc === 'agregar' ? 'Agregar al inventario' : 'Quitar del inventario';
+    const motivos = MOTIVOS[acc];
+    const ayuda = acc === 'agregar'
+      ? 'Usa esta pantalla cuando entren piezas nuevas al inventario: compras a proveedor o ajustes por reconteo.'
+      : 'Usa esta pantalla cuando salgan piezas del inventario: entregas a colaboradores, bajas por daño, o ajustes por reconteo.';
+    html = `
+      <section class="tarjeta">
+        <span class="dueno ${acc}">${site}</span>
+        <h2>${nombre}</h2>
+        <div class="ayuda-ap"><span class="ico" aria-hidden="true">💡</span><span>${ayuda} La fecha y hora se guardan solas al enviar.</span></div>
+        <div class="campos">
+          <label class="campo ancho" id="${pre}resp-w"><span>Quién captura <span class="req">*</span></span>
+            <input type="text" id="${pre}resp" autocomplete="name" value="${esc(localStorage.getItem('epp_resp') || '')}" placeholder="Tu nombre"></label>
+          <div class="campo ancho" id="${pre}motivo-w" role="radiogroup" aria-label="Motivo">
+            <span>Motivo <span class="req">*</span></span>
+            ${tilesOp(pre+'motivo', motivos)}
+          </div>
+          ${campoTipoYTalla(pre)}
+          <label class="campo ancho" id="${pre}ubic-w"><span>Ubicación del EPP <span class="req">*</span></span>
+            <select id="${pre}ubic"><option value="">Selecciona…</option>${UBICACIONES.map(u=>`<option>${u}</option>`).join('')}</select></label>
+          <div class="campo ancho" id="${pre}just-w">
+            <span>Justificación corta <span class="req">*</span></span>
+            <textarea id="${pre}just" rows="2" maxlength="140" placeholder="${acc==='agregar' ? 'Ej. Reconteo físico, sobrante de almacén…' : 'Ej. Entregado a José Pérez, dañado por uso…'}"></textarea>
+            <span class="contador"><span id="${pre}just-n">0</span>/140</span>
+          </div>
+          <div class="resumen-vivo vacio ancho" id="${pre}resumen"><span class="ico" aria-hidden="true">👀</span><span>Completa los campos de arriba para ver aquí un resumen de lo que vas a enviar.</span></div>
+        </div>
+      </section>`;
+  } else if (acc === 'transferencia') {
+    html = `
+      <section class="tarjeta">
+        <span class="dueno transferencia">${site}</span>
+        <h2>Transferencia entre áreas</h2>
+        <div class="ayuda-ap"><span class="ico" aria-hidden="true">💡</span><span>Usa esta pantalla cuando las piezas se mueven de un área a otra sin entrar ni salir del inventario total. La fecha y hora se guardan solas al enviar.</span></div>
+        <div class="campos">
+          <label class="campo ancho" id="${pre}resp-w"><span>Quién captura <span class="req">*</span></span>
+            <input type="text" id="${pre}resp" autocomplete="name" value="${esc(localStorage.getItem('epp_resp') || '')}" placeholder="Tu nombre"></label>
+          <div class="campo ancho" id="${pre}dir-w" role="radiogroup" aria-label="Dirección de la transferencia">
+            <span>Dirección <span class="req">*</span></span>
+            ${tilesOp(pre+'dir', TRANSFERENCIAS)}
+          </div>
+          ${campoTipoYTalla(pre)}
+          <div class="campo ancho" id="${pre}just-w">
+            <span>Justificación corta <span class="req">*</span></span>
+            <textarea id="${pre}just" rows="2" maxlength="140" placeholder="Ej. Reubicación de stock excedente…"></textarea>
+            <span class="contador"><span id="${pre}just-n">0</span>/140</span>
+          </div>
+          <div class="resumen-vivo vacio ancho" id="${pre}resumen"><span class="ico" aria-hidden="true">👀</span><span>Completa los campos de arriba para ver aquí un resumen de lo que vas a enviar.</span></div>
+        </div>
+      </section>`;
+  }
+
+  $('contenido').innerHTML = html;
+  $(pre+'tipo').onchange = () => { refrescarTipo(pre); sucio = true; actualizarResumen(pre, acc); };
+  $(pre+'just').oninput = () => { $(pre+'just-n').textContent = $(pre+'just').value.length; sucio = true; actualizarResumen(pre, acc); };
+  $('contenido').addEventListener('input', () => { sucio = true; actualizarResumen(pre, acc); });
+  $('contenido').addEventListener('change', () => { sucio = true; actualizarResumen(pre, acc); });
+  refrescarTipo(pre);
+  actualizarResumen(pre, acc);
+  $('acciones').hidden = false;
+}
+
+/* ---------- Resumen en vivo (vista previa en lenguaje simple) ---------- */
+function actualizarResumen(pre, acc) {
+  const el = $(pre+'resumen'); if (!el) return;
+  const resp = $(pre+'resp').value.trim();
+  const tipo = $(pre+'tipo').value;
+  const talla = tipo === 'Calzado' ? $(pre+'talla').value : (tipo === 'Guantes de seguridad' ? $(pre+'medida').value : '');
+  const piezas = $(pre+'piezas').value.trim();
+
+  let sujeto = '';
+  if (acc === 'agregar' || acc === 'quitar') {
+    const dirEl = document.querySelector(`input[name="${pre}motivo"]:checked`);
+    const motivo = dirEl ? MOTIVOS[acc][Number(dirEl.value)] : null;
+    const ubic = $(pre+'ubic').value;
+    if (!motivo || !tipo || !piezas || !ubic) { vaciarResumen(el); return; }
+    const verbo = acc === 'agregar' ? 'agregar' : 'quitar';
+    const prep = acc === 'agregar' ? 'en' : 'de';
+    sujeto = `<strong>${esc(resp||'Alguien')}</strong> va a <strong>${verbo} ${esc(piezas)} pza(s)</strong> de <strong>${esc(tipo)}${talla?` (${esc(talla)})`:''}</strong> ${prep} <strong>${esc(ubic)}</strong>, por motivo de "${esc(motivo.valor)}".`;
+  } else if (acc === 'transferencia') {
+    const dirEl = document.querySelector(`input[name="${pre}dir"]:checked`);
+    const dir = dirEl ? TRANSFERENCIAS[Number(dirEl.value)] : null;
+    if (!dir || !tipo || !piezas) { vaciarResumen(el); return; }
+    sujeto = `<strong>${esc(resp||'Alguien')}</strong> va a <strong>transferir ${esc(piezas)} pza(s)</strong> de <strong>${esc(tipo)}${talla?` (${esc(talla)})`:''}</strong>: <strong>${esc(dir.valor)}</strong>.`;
+  }
+  el.classList.remove('vacio');
+  el.innerHTML = `<span class="ico" aria-hidden="true">✅</span><span>${sujeto}</span>`;
+}
+function vaciarResumen(el) {
+  el.classList.add('vacio');
+  el.innerHTML = `<span class="ico" aria-hidden="true">👀</span><span>Completa los campos de arriba para ver aquí un resumen de lo que vas a enviar.</span>`;
+}
+document.querySelectorAll('#pantallaAcciones .tile').forEach(b => b.onclick = () => abrir(b.dataset.accion));
+
+/* ---------- Recolectar y validar ---------- */
+function recolectar() {
+  document.querySelectorAll('.campo.falta').forEach(e => e.classList.remove('falta'));
+  const faltan = [];
+  const marcar = id => { const w = $(id + '-w'); if (w) { w.classList.add('falta'); faltan.push(w); } };
+  const pre = 'c-';
+
+  if (!$(pre+'resp').value.trim()) marcar(pre+'resp');
+
+  const tipo = $(pre+'tipo').value;
+  if (!tipo) marcar(pre+'tipo');
+  let talla = 'N/A', medida = 'N/A';
+  if (tipo === 'Calzado') { talla = $(pre+'talla').value; if (!talla) marcar(pre+'talla'); }
+  if (tipo === 'Guantes de seguridad') { medida = $(pre+'medida').value; if (!medida) marcar(pre+'medida'); }
+
+  const piezasStr = $(pre+'piezas').value.trim();
+  const piezas = Number(piezasStr);
+  if (!piezasStr || isNaN(piezas) || piezas <= 0) marcar(pre+'piezas');
+
+  const justificacion = $(pre+'just').value.trim();
+  if (!justificacion) marcar(pre+'just');
+
+  let movimiento = '', ubicacion = '';
+
+  if (accion === 'agregar' || accion === 'quitar') {
+    const motivoEl = document.querySelector(`input[name="${pre}motivo"]:checked`);
+    if (!motivoEl) marcar(pre+'motivo');
+    const motivo = motivoEl ? MOTIVOS[accion][Number(motivoEl.value)] : null;
+    movimiento = motivo ? motivo.movimiento : '';
+    ubicacion = $(pre+'ubic').value;
+    if (!ubicacion) marcar(pre+'ubic');
+  } else if (accion === 'transferencia') {
+    const dirEl = document.querySelector(`input[name="${pre}dir"]:checked`);
+    if (!dirEl) marcar(pre+'dir');
+    const dir = dirEl ? TRANSFERENCIAS[Number(dirEl.value)] : null;
+    movimiento = dir ? dir.movimiento : '';
+    ubicacion = dir ? dir.destino : '';
+  }
+
+  if (faltan.length) {
+    faltan[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    avisar(`Revisa ${faltan.length} campo(s) marcados en rojo: faltan datos.`, 'error');
+    return null;
+  }
+
+  localStorage.setItem('epp_resp', $(pre+'resp').value.trim());
+  return {
+    token: CONFIG.TOKEN,
+    id: crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2),
+    capturado: new Date().toISOString(),
+    analista: $(pre+'resp').value.trim(),
+    accion, movimiento, tipo, talla, medida, piezas,
+    site, ubicacion, justificacion
+  };
+}
+
+/* ---------- Envío y cola sin conexión ---------- */
+async function enviar(p) {
+  const r = await fetch(CONFIG.URL_SCRIPT, { method: 'POST', body: JSON.stringify(p) }); // text/plain: sin preflight CORS
+  const j = await r.json();
+  if (!j.ok) { const e = new Error(j.error || 'Error del servidor'); e.servidor = true; throw e; }
+  return j;
+}
+const leerPend = () => { try { return JSON.parse(localStorage.getItem(CLAVE_PEND)) || []; } catch { return []; } };
+const guardarPend = l => { try { localStorage.setItem(CLAVE_PEND, JSON.stringify(l)); return true; } catch { return false; } };
+function pintarPend() {
+  const n = leerPend().length;
+  $('pendientes').classList.toggle('visible', n > 0);
+  $('pendTxt').textContent = n === 1 ? '1 registro guardado en este equipo sin enviar.' : `${n} registros guardados en este equipo sin enviar.`;
+}
+async function enviarPendientes(silencioso) {
+  const lista = leerPend(); if (!lista.length) return;
+  const resto = [];
+  for (const p of lista) { try { await enviar(p); registrarHistorial(p); } catch { resto.push(p); } }
+  guardarPend(resto); pintarPend();
+  if (!silencioso) avisar(resto.length ? 'Sigue sin conexión. Se reintentará al recuperar señal.' : 'Registros pendientes enviados.', resto.length ? 'error' : 'ok');
+}
+
+$('btnEnviar').onclick = async () => {
+  if (!accion) return;
+  const p = recolectar(); if (!p) return;
+  const b = $('btnEnviar'); b.disabled = true; b.textContent = 'Enviando…';
+  try {
+    await enviar(p); registrarHistorial(p);
+    avisar('Registro enviado correctamente.', 'ok'); sucio = false; mostrarAcciones();
+  } catch (err) {
+    if (err.servidor) avisar('No se guardó: ' + err.message, 'error');
+    else {
+      const l = leerPend(); l.push(p);
+      if (guardarPend(l)) { avisar('Sin conexión. El registro se guardó en este equipo y se enviará después.', 'error'); sucio = false; mostrarAcciones(); }
+      else avisar('Sin conexión y sin espacio para guardar. No cierres la página y reintenta.', 'error');
+      pintarPend();
+    }
+  } finally { b.disabled = false; b.textContent = 'Enviar registro'; window.scrollTo({ top: 0, behavior: 'smooth' }); }
+};
+
+let tAviso;
+function avisar(msg, tipo) {
+  const a = $('aviso'); a.textContent = msg; a.className = 'aviso visible ' + (tipo || '');
+  clearTimeout(tAviso); tAviso = setTimeout(() => a.className = 'aviso', 4500);
+}
+
+$('btnPend').onclick = () => enviarPendientes(false);
+window.addEventListener('online', () => enviarPendientes(true));
+window.addEventListener('beforeunload', e => { if (sucio) { e.preventDefault(); e.returnValue=''; } });
+
+construirSites(); pintarPend();
+if (navigator.onLine) enviarPendientes(true);
+</script>
+</body>
+</html>
