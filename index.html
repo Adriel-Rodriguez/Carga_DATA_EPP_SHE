@@ -61,6 +61,17 @@
   .tile.prestamo{border-left-color:var(--morado)}
   .tile.prestamo .ico{background:var(--morado-bg)}
   .tile.prestamo:hover{box-shadow:0 10px 22px rgba(45,50,118,.2)}
+  .tile.recepcion{border-left-color:var(--verde)}
+  .tile.recepcion .ico{background:var(--verde-bg)}
+  .tile.entrega{border-left-color:var(--rojo)}
+  .tile.entrega .ico{background:var(--rojo-bg)}
+  .dueno.recepcion{color:#00733A;background:var(--verde-bg)}
+  .dueno.entrega{color:#B3192B;background:var(--rojo-bg)}
+  .vol-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:10px}
+  .vol-item{display:flex;flex-direction:column;gap:4px;font-size:.8rem;font-weight:700;color:var(--suave)}
+  .vol-item input{width:100%;font:inherit;font-size:1rem;padding:9px 8px;border:1px solid var(--linea);border-radius:8px;text-align:center}
+  .vol-item input:not(:placeholder-shown){border-color:var(--azul);background:var(--azul-bg)}
+  .vol-total{font-weight:800;color:var(--tinta);font-size:.95rem;margin-top:2px}
   .tile .nom{font-size:1.1rem;font-weight:800}
   .tile .des{font-size:.85rem;color:var(--suave);line-height:1.35}
   .tile:focus-visible{outline:3px solid var(--azul);outline-offset:2px}
@@ -239,6 +250,10 @@
   :root[data-theme="dark"] .aviso.error{ background:var(--rojo); color:#fff; }
   :root[data-theme="dark"] .aviso.ok{ background:var(--verde); color:#fff; }
   :root[data-theme="dark"] textarea::placeholder,:root[data-theme="dark"] input::placeholder{ color:#7C7FA0; }
+  :root[data-theme="dark"] .vol-item input:not(:placeholder-shown){ background:var(--azul-bg); border-color:var(--azul); }
+  :root[data-theme="dark"] .vol-total{ color:#C9CCFF; }
+  :root[data-theme="dark"] .dueno.recepcion{ color:#3fd19f; }
+  :root[data-theme="dark"] .dueno.entrega{ color:#ff8a93; }
   :root[data-theme="dark"] .evid-caja{ background:var(--tarjeta); border-color:#4A4E7A; }
   :root[data-theme="dark"] .evid-btn{ color:#8CB8FF; }
   :root[data-theme="dark"] .dueno.prestamo{ color:#C9CCFF; }
@@ -307,6 +322,18 @@
         <span class="des">Un site presta piezas a otro: se descuenta y se suma solo</span>
         <svg class="flecha" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
       </button>
+      <button type="button" class="tile recepcion" data-accion="recepcion">
+        <span class="ico" aria-hidden="true">📦</span>
+        <span class="nom">Recepción a volumen</span>
+        <span class="des">Entrada de varias tallas o medidas en un solo registro</span>
+        <svg class="flecha" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+      </button>
+      <button type="button" class="tile entrega" data-accion="entrega">
+        <span class="ico" aria-hidden="true">🚚</span>
+        <span class="nom">Entrega a volumen</span>
+        <span class="des">Salida de varias tallas o medidas a un área o grupo</span>
+        <svg class="flecha" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+      </button>
     </div>
 
     <div class="act-reciente" id="actReciente">
@@ -368,6 +395,8 @@ const PUESTOS = ['REP','TL','TL SR.','ANALISTA','ANALISTA SR.','SUPERVISOR','MAN
 const TURNOS = ['Turno 1A','Turno 1B','Turno 2A','Turno 2B','Turno 3A','Turno 3B','Turno 4','Turno 5'];
 /* Préstamo entre sites: el servidor escribe 2 filas (salida en el que presta, entrada en el que recibe) */
 const MOV_PRESTAMO_SALIDA = 'Salida de EPP por préstamo a otro site (Obligatorio adjuntar evidencia de quien recibe)';
+/* Volumen: un registro con varias tallas/medidas (una fila por talla en la hoja, mismo Lote) */
+const MOV_ENTREGA_VOLUMEN = 'Salida de EPP por entrega a volumen (Obligatorio adjuntar evidencia de quien recibe)';
 /* ===================================================== */
 
 const CLAVE_PEND = 'epp_carga_pendientes';
@@ -712,6 +741,11 @@ function enlazarEvidencia(pre, acc) {
 /* ¿Este movimiento exige evidencia? (el propio nombre del movimiento dice "adjuntar") */
 function movimientoActual(pre, acc) {
   if (acc === 'prestamo') return MOV_PRESTAMO_SALIDA;
+  if (acc === 'entrega') return MOV_ENTREGA_VOLUMEN;
+  if (acc === 'recepcion') {
+    const el = document.querySelector(`input[name="${pre}motivo"]:checked`);
+    return el ? MOTIVOS.agregar[Number(el.value)].movimiento : '';
+  }
   if (acc === 'transferencia') {
     const el = document.querySelector(`input[name="${pre}dir"]:checked`);
     return el ? TRANSFERENCIAS[Number(el.value)].movimiento : '';
@@ -729,7 +763,7 @@ function refrescarEvidencia(pre, acc) {
 function refrescarProveedor(pre, acc) {
   const w = $(pre+'prov-w'); if (!w) return;
   const el = document.querySelector(`input[name="${pre}motivo"]:checked`);
-  w.hidden = !(acc === 'agregar' && el && MOTIVOS.agregar[Number(el.value)].pideProveedor);
+  w.hidden = !((acc === 'agregar' || acc === 'recepcion') && el && MOTIVOS.agregar[Number(el.value)].pideProveedor);
 }
 
 /* ---------- Abrir cada acción ---------- */
@@ -827,15 +861,53 @@ function abrir(acc) {
           <div class="resumen-vivo vacio ancho" id="${pre}resumen"><span class="ico" aria-hidden="true">👀</span><span>Completa los campos de arriba para ver aquí un resumen de lo que vas a enviar.</span></div>
         </div>
       </section>`;
+  } else if (acc === 'recepcion' || acc === 'entrega') {
+    const rec = acc === 'recepcion';
+    html = `
+      <section class="tarjeta">
+        <span class="dueno ${acc}">${site}</span>
+        <h2>${rec ? 'Recepción a volumen' : 'Entrega a volumen'}</h2>
+        <div class="ayuda-ap"><span class="ico" aria-hidden="true">💡</span><span>${rec ? 'Captura <strong>todas las tallas o medidas de una sola vez</strong>: escribe las piezas de cada una y deja vacías las que no llegaron. Un solo proveedor, una sola evidencia.' : 'Entrega <strong>varias tallas o medidas a un área o grupo</strong> en un solo registro. Escribe las piezas de cada una y deja vacías las que no salen. Para entregas a una persona usa Quitar → Entrega a colaborador.'} La fecha y hora se guardan solas al enviar.</span></div>
+        <div class="campos">
+          <label class="campo ancho" id="${pre}resp-w"><span>Quién captura <span class="req">*</span></span>
+            <input type="text" id="${pre}resp" autocomplete="name" value="${esc(localStorage.getItem('epp_resp') || '')}" placeholder="Tu nombre"></label>
+          ${rec ? `<div class="campo ancho" id="${pre}motivo-w" role="radiogroup" aria-label="Motivo">
+            <span>Motivo <span class="req">*</span></span>
+            ${tilesOp(pre+'motivo', MOTIVOS.agregar)}
+          </div>
+          <label class="campo ancho" id="${pre}prov-w" hidden><span>Nombre del proveedor <span class="req">*</span></span>
+            <input type="text" id="${pre}prov" list="${pre}prov-lista" autocomplete="off" maxlength="80" placeholder="Ej. Calzado Industrial del Norte">
+            <datalist id="${pre}prov-lista">${leerJSON(CLAVE_PROV, []).map(p=>`<option value="${esc(p)}">`).join('')}</datalist></label>`
+          : `<label class="campo ancho" id="${pre}dest-w"><span>¿A qué área o grupo se entrega? <span class="req">*</span></span>
+            <input type="text" id="${pre}dest" autocomplete="off" maxlength="80" placeholder="Ej. Picking turno 2, Nuevos ingresos de octubre…"></label>`}
+          <label class="campo ancho" id="${pre}tipo-w"><span>Tipo de EPP <span class="req">*</span></span>
+            <select id="${pre}tipo"><option value="">Selecciona…</option><option>Calzado</option><option>Guantes de seguridad</option></select></label>
+          <div class="campo ancho" id="${pre}grid-w" hidden>
+            <span>Piezas por talla o medida <span class="req">*</span></span>
+            <div class="vol-grid" id="${pre}grid"></div>
+            <div class="vol-total" id="${pre}total"></div>
+          </div>
+          <label class="campo ancho" id="${pre}ubic-w"><span>${rec ? '¿A dónde entra?' : '¿De dónde se descuenta?'} <span class="req">*</span></span>
+            <select id="${pre}ubic"><option value="">Selecciona…</option>${UBICACIONES.map(u=>`<option>${u}</option>`).join('')}</select></label>
+          ${campoEvidencia(pre)}
+          <div class="campo ancho" id="${pre}just-w">
+            <span>Justificación corta <span class="req">*</span></span>
+            <textarea id="${pre}just" rows="2" maxlength="140" placeholder="${rec ? 'Ej. Pedido 4500123, llegó completo…' : 'Ej. Dotación mensual del área…'}"></textarea>
+            <span class="contador"><span id="${pre}just-n">0</span>/140</span>
+          </div>
+          <div class="resumen-vivo vacio ancho" id="${pre}resumen"><span class="ico" aria-hidden="true">👀</span><span>Completa los campos de arriba para ver aquí un resumen de lo que vas a enviar.</span></div>
+        </div>
+      </section>`;
   }
 
   $('contenido').innerHTML = html;
+  const esVol = acc === 'recepcion' || acc === 'entrega';
   const alCambiar = () => {
     sucio = true;
-    refrescarProveedor(pre, acc); refrescarEvidencia(pre, acc); refrescarColaborador(pre, acc);
+    refrescarProveedor(pre, acc); refrescarEvidencia(pre, acc); if (!esVol) refrescarColaborador(pre, acc);
     actualizarResumen(pre, acc);
   };
-  $(pre+'tipo').onchange = () => { refrescarTipo(pre); alCambiar(); };
+  $(pre+'tipo').onchange = () => { if (esVol) pintarGridVolumen(pre); else refrescarTipo(pre); alCambiar(); };
   $(pre+'just').oninput = () => { $(pre+'just-n').textContent = $(pre+'just').value.length; };
   // Se asigna (no addEventListener) para no acumular manejadores al abrir otra acción
   $('contenido').oninput = alCambiar;
@@ -848,14 +920,31 @@ function abrir(acc) {
       alCambiar();
     };
   }
-  refrescarTipo(pre);
-  refrescarProveedor(pre, acc); refrescarEvidencia(pre, acc); refrescarColaborador(pre, acc);
+  if (!esVol) refrescarTipo(pre);
+  refrescarProveedor(pre, acc); refrescarEvidencia(pre, acc); if (!esVol) refrescarColaborador(pre, acc);
   actualizarResumen(pre, acc);
   $('acciones').hidden = false;
 }
 
+/* ---------- Volumen: grid de tallas / medidas ---------- */
+function pintarGridVolumen(pre) {
+  const tipo = $(pre+'tipo').value;
+  const lista = tipo === 'Calzado' ? SHOE_ORDER : (tipo === 'Guantes de seguridad' ? GLOVE_ORDER : []);
+  $(pre+'grid-w').hidden = !lista.length;
+  $(pre+'grid').innerHTML = lista.map((t,i) => `<label class="vol-item">${esc(tipo==='Calzado'?'Talla '+t:t)}
+    <input type="number" inputmode="numeric" min="0" step="1" placeholder="0" data-vol="${esc(t)}" id="${pre}v${i}"></label>`).join('');
+}
+function itemsVolumen(pre) {
+  const tipo = $(pre+'tipo').value;
+  return [...document.querySelectorAll(`#${pre}grid input[data-vol]`)]
+    .map(i => ({ clave: i.dataset.vol, n: Math.trunc(Number(i.value)) }))
+    .filter(x => x.n > 0)
+    .map(x => ({ tipo, talla: tipo === 'Calzado' ? x.clave : 'N/A', medida: tipo === 'Guantes de seguridad' ? x.clave : 'N/A', piezas: x.n }));
+}
+
 /* ---------- Resumen en vivo (vista previa en lenguaje simple) ---------- */
 function actualizarResumen(pre, acc) {
+  if (acc === 'recepcion' || acc === 'entrega') return resumenVolumen(pre, acc);
   const el = $(pre+'resumen'); if (!el) return;
   const resp = $(pre+'resp').value.trim();
   const tipo = $(pre+'tipo').value;
@@ -891,6 +980,24 @@ function actualizarResumen(pre, acc) {
   el.classList.remove('vacio');
   el.innerHTML = `<span class="ico" aria-hidden="true">✅</span><span>${sujeto}</span>`;
 }
+function resumenVolumen(pre, acc) {
+  const el = $(pre+'resumen'); if (!el) return;
+  const items = itemsVolumen(pre), tipo = $(pre+'tipo').value;
+  const tot = items.reduce((a,x)=>a+x.piezas,0);
+  const t = $(pre+'total'); if (t) t.textContent = items.length ? `Total: ${tot} pza(s) en ${items.length} ${tipo==='Calzado'?'talla(s)':'medida(s)'}` : '';
+  const resp = $(pre+'resp').value.trim(), ubic = $(pre+'ubic').value;
+  const rec = acc === 'recepcion';
+  const m = rec ? document.querySelector(`input[name="${pre}motivo"]:checked`) : null;
+  const dest = rec ? '' : $(pre+'dest').value.trim();
+  if (!items.length || !ubic || (rec && !m) || (!rec && !dest)) { vaciarResumen(el); return; }
+  const det = items.map(x => `${esc(x.talla!=='N/A'?x.talla:x.medida)}: ${x.piezas}`).join(', ');
+  const prov = rec && MOTIVOS.agregar[Number(m.value)].pideProveedor ? $(pre+'prov').value.trim() : '';
+  const sujeto = rec
+    ? `<strong>${esc(resp||'Alguien')}</strong> va a <strong>agregar ${tot} pza(s)</strong> de <strong>${esc(tipo)}</strong> en <strong>${esc(ubic)}</strong> (${site}), por "${esc(MOTIVOS.agregar[Number(m.value)].valor)}"${prov?`, proveedor <strong>${esc(prov)}</strong>`:''}. Detalle: ${det}.`
+    : `<strong>${esc(resp||'Alguien')}</strong> va a <strong>entregar ${tot} pza(s)</strong> de <strong>${esc(tipo)}</strong> a <strong>${esc(dest)}</strong>, descontando de <strong>${esc(ubic)}</strong> (${site}). Detalle: ${det}.`;
+  el.classList.remove('vacio');
+  el.innerHTML = `<span class="ico" aria-hidden="true">✅</span><span>${sujeto}</span>`;
+}
 function vaciarResumen(el) {
   el.classList.add('vacio');
   el.innerHTML = `<span class="ico" aria-hidden="true">👀</span><span>Completa los campos de arriba para ver aquí un resumen de lo que vas a enviar.</span>`;
@@ -899,6 +1006,7 @@ document.querySelectorAll('#pantallaAcciones .tile').forEach(b => b.onclick = ()
 
 /* ---------- Recolectar y validar ---------- */
 function recolectar() {
+  if (accion === 'recepcion' || accion === 'entrega') return recolectarVolumen();
   document.querySelectorAll('.campo.falta').forEach(e => e.classList.remove('falta'));
   const faltan = [];
   const marcar = id => { const w = $(id + '-w'); if (w) { w.classList.add('falta'); faltan.push(w); } };
@@ -1012,6 +1120,60 @@ function recolectar() {
   if (proveedor) p.proveedor = proveedor;
   if (colaborador) p.colaborador = colaborador;
   if (accion === 'prestamo') Object.assign(p, { origen, destino, ubicOrigen, ubicDestino });
+  if (evidencia) p.evidencia = { nombre: evidencia.nombre, mime: evidencia.mime, base64: evidencia.base64 };
+  return p;
+}
+
+function recolectarVolumen() {
+  document.querySelectorAll('.campo.falta').forEach(e => e.classList.remove('falta'));
+  const faltan = [];
+  const marcar = id => { const w = $(id + '-w'); if (w) { w.classList.add('falta'); faltan.push(w); } };
+  const pre = 'c-', rec = accion === 'recepcion';
+  if (!$(pre+'resp').value.trim()) marcar(pre+'resp');
+  let motivo = null, proveedor = '', destinoEntrega = '';
+  if (rec) {
+    const mEl = document.querySelector(`input[name="${pre}motivo"]:checked`);
+    if (!mEl) marcar(pre+'motivo'); else motivo = MOTIVOS.agregar[Number(mEl.value)];
+    if (motivo && motivo.pideProveedor) { proveedor = $(pre+'prov').value.trim(); if (!proveedor) marcar(pre+'prov'); }
+  } else {
+    destinoEntrega = $(pre+'dest').value.trim(); if (!destinoEntrega) marcar(pre+'dest');
+  }
+  const tipo = $(pre+'tipo').value; if (!tipo) marcar(pre+'tipo');
+  const items = tipo ? itemsVolumen(pre) : [];
+  const malas = [...document.querySelectorAll(`#${pre}grid input[data-vol]`)].filter(i => i.value.trim() !== '' && (!Number.isInteger(Number(i.value)) || Number(i.value) < 0));
+  malas.forEach(i => { i.style.borderColor = 'var(--rojo)'; });
+  document.querySelectorAll(`#${pre}grid input[data-vol]`).forEach(i => { if (!malas.includes(i)) i.style.borderColor = ''; });
+  if (tipo && (!items.length || malas.length)) marcar(pre+'grid');
+  const ubicacion = $(pre+'ubic').value; if (!ubicacion) marcar(pre+'ubic');
+  const justificacion = $(pre+'just').value.trim(); if (!justificacion) marcar(pre+'just');
+  const movimiento = rec ? (motivo ? motivo.movimiento : '') : MOV_ENTREGA_VOLUMEN;
+  if (evidenciaObligatoria(pre, accion) && !evidencia) marcar(pre+'evid');
+  if (faltan.length) {
+    faltan[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    avisar(`Revisa ${faltan.length} campo(s) marcados en rojo: faltan datos o las piezas no son un número entero.`, 'error');
+    return null;
+  }
+  if (!rec) {
+    const cortas = items.map(x => ({ x, hay: stockDe(site, ubicacion, x.tipo, x.talla, x.medida) }))
+      .filter(o => o.hay !== null && o.x.piezas > o.hay)
+      .map(o => `${o.x.talla !== 'N/A' ? 'talla ' + o.x.talla : o.x.medida}: pides ${o.x.piezas}, hay ${o.hay}`);
+    if (cortas.length && !confirm(`En ${ubicacion} de ${site} no alcanza según la hoja:\n• ${cortas.join('\n• ')}\n\n¿Registrar la entrega de todos modos?`)) return null;
+  }
+  localStorage.setItem('epp_resp', $(pre+'resp').value.trim());
+  if (proveedor) {
+    const lista = leerJSON(CLAVE_PROV, []).filter(p => p.toLowerCase() !== proveedor.toLowerCase());
+    lista.unshift(proveedor);
+    try { localStorage.setItem(CLAVE_PROV, JSON.stringify(lista.slice(0, 30))); } catch {}
+  }
+  const p = {
+    token: CONFIG.TOKEN,
+    id: crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2),
+    capturado: new Date().toISOString(),
+    analista: $(pre+'resp').value.trim(),
+    accion: 'volumen', direccion: accion, movimiento, items, site, ubicacion, justificacion
+  };
+  if (proveedor) p.proveedor = proveedor;
+  if (destinoEntrega) p.destinoEntrega = destinoEntrega;
   if (evidencia) p.evidencia = { nombre: evidencia.nombre, mime: evidencia.mime, base64: evidencia.base64 };
   return p;
 }
